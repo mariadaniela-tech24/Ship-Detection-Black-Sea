@@ -2,8 +2,8 @@ import os
 import requests
 
 def download_sentinel1_scene():
-    username = "YOUR_EMAIL"
-    password = "YOUR_CDSE_PASSWORD" # removed for Github purposes
+    username = "mariadaniela.balaceanu@gmail.com"
+    password = "nNv#xbgVw94R3xX" 
     
     # Constanța Port Bounding Box
     roi_wkt = "POLYGON((28.60 44.10, 28.70 44.10, 28.70 44.20, 28.60 44.20, 28.60 44.10))"
