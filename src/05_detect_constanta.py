@@ -4,12 +4,11 @@ import cv2
 import numpy as np
 from pathlib import Path
 from ultralytics import YOLO
-import tifffile # <-- NEW IMPORT
+import tifffile 
 
 def process_and_detect():
-    # Setup paths
     raw_s1_dir = Path("data/raw/sentinel1")
-    processed_dir = Path("data/processed/sentinel1_png")
+    processed_dir = Path("data/processed/sentinel1_tiles")
     processed_dir.mkdir(parents=True, exist_ok=True)
     
     print("1. Looking for Sentinel-1 raw data...")
@@ -21,69 +20,73 @@ def process_and_detect():
     target_zip = zip_files[0]
     extract_path = raw_s1_dir / target_zip.stem
     
-    # Extract the ZIP if we haven't already
     if not extract_path.exists():
-        print(f"2. Extracting {target_zip.name} (This might take a minute)...")
+        print(f"2. Extracting {target_zip.name}...")
         with zipfile.ZipFile(target_zip, 'r') as zip_ref:
             zip_ref.extractall(raw_s1_dir)
     else:
         print("2. Sentinel-1 data already extracted.")
     
-    # Find the VV polarization TIFF (best for ship detection)
     tiff_files = list(extract_path.rglob("measurement/*-vv-*.tiff"))
     if not tiff_files:
-        print("Error: Could not find the VV measurement TIFF inside the SAFE folder.")
+        print("Error: Could not find the VV measurement TIFF.")
         return
         
     target_tiff = tiff_files[0]
-    png_out_path = processed_dir / f"{target_zip.stem}_VV.png"
     
-    # Convert the massive 16-bit TIFF into a usable PNG
-    if not png_out_path.exists():
-        print("3. Converting 16-bit SAR TIFF to 8-bit PNG...")
-        
-        # --- FIX: Using tifffile to handle ZSTD compressed Sentinel-1 data ---
-        img = tifffile.imread(str(target_tiff))
-        
-        print("   Resizing image for memory safety...")
-        scale_percent = 25 # Scale down to 25% of original size
-        width = int(img.shape[1] * scale_percent / 100)
-        height = int(img.shape[0] * scale_percent / 100)
-        img = cv2.resize(img, (width, height), interpolation=cv2.INTER_AREA)
-
-        # Normalize the pixel values (stretching contrast to make ships visible)
-        p2, p98 = np.percentile(img, (2, 98))
-        img_norm = np.clip(img, p2, p98)
-        img_norm = (img_norm - p2) / (p98 - p2) * 255.0
-        img_norm = img_norm.astype(np.uint8)
-        
-        cv2.imwrite(str(png_out_path), img_norm)
-        print(f"   Saved processed PNG to {png_out_path}")
-    else:
-        print("3. Processed PNG already exists.")
-
-    print("\n4. Loading our trained YOLOv8 model...")
-    # Using the exact path generated during our training phase
-    model_path = "runs/detect/models/yolov8_ship_detector_v1/weights/best.pt"
-    
+    print("3. Loading our trained YOLOv8 model...")
+    model_path = "runs/detect/models/yolov8_ship_detector_v2/weights/best.pt"
     if not os.path.exists(model_path):
-        print(f"Error: Model not found at {model_path}")
+        print(f"Error: Model not found at {model_path}.")
         return
-
     model = YOLO(model_path)
+
+    print("4. Reading massive SAR image into memory...")
+    img = tifffile.imread(str(target_tiff))
+    img_h, img_w = img.shape
+    print(f"   Original image size: {img_w}x{img_h} pixels!")
+
+    print("\n5. Starting Sliding Window Scanner...")
+    tile_size = 1024  # Size of the chunks we will feed to YOLO
+    ships_found = 0
     
-    print("\n5. Running Ship Detection on Constanța Port...")
-    # Run the prediction and save the visual map
-    results = model.predict(
-        source=str(png_out_path),
-        save=True,
-        conf=0.25, # Confidence threshold
-        name="constanta_ship_detections",
-        project="data/processed"
-    )
-    
-    print("\nSUCCESS! Pipeline complete end-to-end.")
-    print("Check the 'data/processed/constanta_ship_detections' folder for your final mapped image!")
+    # Scan across the image in a grid
+    for y in range(0, img_h, tile_size):
+        for x in range(0, img_w, tile_size):
+            # Cut out the tile
+            tile = img[y:y+tile_size, x:x+tile_size]
+            
+            # Skip tiles that are too small (edges of the image)
+            if tile.shape[0] < 512 or tile.shape[1] < 512:
+                continue
+                
+            # Normalize the radar data for this specific tile
+            p2, p98 = np.percentile(tile, (2, 98))
+            if p98 == p2: # Skip empty black tiles
+                continue
+                
+            tile_norm = np.clip(tile, p2, p98)
+            tile_norm = (tile_norm - p2) / (p98 - p2) * 255.0
+            tile_norm = tile_norm.astype(np.uint8)
+            
+            # Convert to 3-channel image as YOLO expects RGB format
+            tile_rgb = cv2.cvtColor(tile_norm, cv2.COLOR_GRAY2RGB)
+            
+            # Run YOLO on the tile
+            results = model.predict(source=tile_rgb, conf=0.25, verbose=False)
+            
+            # If YOLO found a bounding box (a ship), save this tile!
+            if len(results[0].boxes) > 0:
+                ships_found += len(results[0].boxes)
+                save_path = processed_dir / f"ship_tile_y{y}_x{x}.jpg"
+                
+                # Draw the boxes and save
+                annotated_tile = results[0].plot() 
+                cv2.imwrite(str(save_path), annotated_tile)
+                print(f"   [!] Found ships at Y:{y}, X:{x} -> Saved tile.")
+
+    print(f"\nSUCCESS! Scanner finished. Found {ships_found} total ships.")
+    print(f"Check the '{processed_dir}' folder to see the cropped images with bounding boxes!")
 
 if __name__ == "__main__":
     process_and_detect()
