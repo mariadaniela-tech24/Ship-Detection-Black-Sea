@@ -22,8 +22,8 @@ def train_ship_detector():
         batch=8,            
         name='yolov8_ship_detector_v2',
         project='models',
-        device=0,           # '0' tells PyTorch to use your NVIDIA GPU
-        patience=15         # Early stopping if the model stops improving
+        device=0,         
+        patience=15        
     )
     
     print("\nTraining complete! Your high-recall model is ready.")
