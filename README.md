@@ -20,11 +20,9 @@ This repository presents a complete, end-to-end machine learning pipeline design
 ### ✨ Detection Showcase
 Here are real examples of the model successfully identifying vessels within complex inland waterways using the SAR backscatter signatures:
 
-<p align="center">
-  <img width="400" height="400" alt="Screenshot 2026-09-03 152320" src="https://github.com/user-attachments/assets/8f919f35-4ed8-4ab5-a143-ddbbb0ab0f86" />
-<img width="400" height="400" alt="Screenshot 2026-09-03 152419" src="https://github.com/user-attachments/assets/fa450716-9e79-4ead-8edb-37fec038d1c0" />
-</p>
-
+| Training Data Image | Random Internet Image |
+| :---: | :---: |
+| <img src="./ss1.png" width="100%"> | <img src="./ss2.png" width="100%"> |
 
 ---
 
@@ -32,7 +30,7 @@ Here are real examples of the model successfully identifying vessels within comp
 
 **1. Clone the repository**
 
-    git clone https://github.com/YOUR_USERNAME/sentinel1-ship-detection.git
+    git clone https://github.com/mariadaniela-tech24/Ship-Detection-Black-Sea.git
     cd sentinel1-ship-detection
 
 **2. Setup the Environment (Windows/CUDA)**
@@ -50,7 +48,7 @@ Here are real examples of the model successfully identifying vessels within comp
 *   **Train the Model:** Execute `python src/04_train_yolo.py` to initiate GPU-accelerated training over 50 epochs (512px resolution).
 *   **Execute the Scanner:** Run `python src/05_detect_constanta.py` to deploy the sliding-window scanner across the entire SAR image.
 *   **Run a Live Demo:** Execute `python src/06_demo.py` to test the model on a single radar tile and visualize the generated bounding boxes.
-
+*   **Launch Web App:** Execute `python src/07_app.py` to start the interactive Gradio interface.
 ---
   > **ROSPIN Summer School Project**  
 > *This project was developed as part of the ROSPIN Summer School. For more information and other projects, visit the [ROSPIN GitHub organization](https://github.com/Romanian-Space-Initiative).*
